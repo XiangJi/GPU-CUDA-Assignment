@@ -1,14 +1,14 @@
-#include <stdio.h>
-#include <sys/time.h>
-#include <cuda.h>
-#include <cfloat>
-
+#include <stdio.h>  // C standard I/O header
+#include <sys/time.h> // system time
+#include <cuda.h> //Defines the public host functions and types for the CUDA driver API
+#include <cfloat> //C float.h
+#include <stdlib.h>
 //VERSION 1.4 MODIFIED 7/8 13:08 by Jack
 
 // The number of threads per blocks in the kernel
 // (if we define it here, then we can use its value in the kernel,
 //  for example to statically declare an array in shared memory)
-const int threads_per_block = 256;
+const int threads_per_block = 256; //256 threads per block
 
 
 // Forward function declarations
@@ -25,40 +25,42 @@ int main(int argc, char **argv) {
 
     //default kernel
     int kernel_code = 1;
-    
-    // Parse vector length and kernel options
+    //argc = number of arguements, argv = arguement string
+    //sample arguements  vectormax 256 -k 1 [0123]
+    // Parse vector length and kernel options, arguement listener
     int N;
     if(argc == 2) {
         N = atoi(argv[1]); // user-specified value
     } else if (argc == 4 && !strcmp(argv[2], "-k")) {
         N = atoi(argv[1]); // user-specified value
         kernel_code = atoi(argv[3]); 
-        printf("KERNEL_CODE %d\n", kernel_code);
+        printf("KERNEL_CODE %d\n", kernel_code); //decimal output
     } else {
-        die("USAGE: ./vector_max <vector_length> -k <kernel_code>");
+        die("USAGE: ./vector_max <vector_length> -k <kernel_code>");//otherwise promote usage
     }
 
     // Seed the random generator (use a constant here for repeatable results)
-    srand(10);
+    srand(10);//generate seed for rand function to get random number
 
     // Generate a random vector
-    // You can use "get_increasing_vector()" for debugging
-    long long vector_start_time = start_timer();
-    float *vec = get_random_vector(N);
-    //float *vec = get_increasing_vector(N);
+    // You can use "get_increasing_vector()" for debugging, vector with order
+    long long vector_start_time = start_timer(); // longlong 64 bits variable
+    float *vec = get_random_vector(N); // get random vector of N, rand() inside
+
+    //float *vec = get_increasing_vector(N); just for debugging
     stop_timer(vector_start_time, "Vector generation");
 	
     // Compute the max on the GPU
     long long GPU_start_time = start_timer();
     float result_GPU = GPU_vector_max(vec, N, kernel_code);
-    long long GPU_time = stop_timer(GPU_start_time, "\t            Total");
+    long long GPU_time = stop_timer(GPU_start_time, "\t            Total");// t = tab
 	
     // Compute the max on the CPU
     long long CPU_start_time = start_timer();
     float result_CPU = CPU_vector_max(vec, N);
     long long CPU_time = stop_timer(CPU_start_time, "\nCPU");
     
-    // Free vector
+    // Free vector, release the memory for vec, opposite to malloc
     free(vec);
 
     // Compute the speedup or slowdown
@@ -75,7 +77,7 @@ int main(int argc, char **argv) {
 
 
 // A GPU kernel that computes the maximum value of a vector
-// (each lead thread (threadIdx.x == 0) computes a single value
+// (each lead thread (threadIdx.x == 0) computes a single value, parallel kernel
 __global__ void vector_max_kernel(float *in, float *out, int N) {
 
     // Determine the "flattened" block id and thread id
@@ -108,10 +110,10 @@ __global__ void vector_max_kernel(float *in, float *out, int N) {
     }
 }
 
-// Returns the maximum value within a vector of length N
+// Returns the maximum value within a vector of length N, use GPU method
 float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
 
-    int vector_size = N * sizeof(float);
+    int vector_size = N * sizeof(float);//size of float
 
     // Allocate CPU memory for the result
     float *out_CPU = (float *) malloc(vector_size);
@@ -182,12 +184,12 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     float max = out_CPU[0];
     free(out_CPU);
 
-    //return a single statistic
+    //return a single statistic, max in vector
     return max;
 }
 
 
-// Returns the maximum value within a vector of length N
+// Returns the maximum value within a vector of length N, just CPU simple MAX function
 float CPU_vector_max(float *vec, int N) {	
 
     // find the max
@@ -204,18 +206,18 @@ float CPU_vector_max(float *vec, int N) {
 }
 
 
-// Returns a randomized vector containing N elements
+// Returns a randomized vector containing N elements, vector generator
 float *get_random_vector(int N) {
     if (N < 1) die("Number of elements must be greater than zero");
 	
-    // Allocate memory for the vector
+    // Allocate memory for the vector, memory size N float, malloc
     float *V = (float *) malloc(N * sizeof(float));
     if (V == NULL) die("Error allocating CPU memory");
 	
     // Populate the vector with random numbers
     for (int i = 0; i < N; i++) V[i] = (float) rand() / (float) rand();
 	
-    // Return the randomized vector
+    // Return the randomized vector, float *V
     return V;
 }
 
@@ -226,15 +228,16 @@ float *get_increasing_vector(int N) {
     float *V = (float *) malloc(N * sizeof(float));
     if (V == NULL) die("Error allocating CPU memory");
 	
-    // Populate the vector with random numbers
+    // Populate the vector with random numbers, number fixed 1, 2, 3...
     for (int i = 0; i < N; i++) V[i] = (float) i;
 	
     // Return the randomized vector
     return V;
 }
 
+//use it for debug kernel
 void checkError() {
-    // Check for kernel errors
+    // Check for kernel errors, based on cuda lib
     cudaError_t error = cudaGetLastError();
     if (error) {
         char message[256];
@@ -243,15 +246,17 @@ void checkError() {
     }
 }
 
-// Returns the current time in microseconds
+// Returns the current time in microseconds, (us)
+//int gettimeofday (struct timeval *tv, struct timezone *tz)
+//timeval ---- tv_sec , tv_usec
 long long start_timer() {
-    struct timeval tv;
+    struct timeval tv; //define tv as a stuct in sys/time.h, second and microsecond
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 
-// Prints the time elapsed since the specified time
+// Prints the time elapsed since the specified time, print and return the time interval
 long long stop_timer(long long start_time, char *name) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -261,8 +266,8 @@ long long stop_timer(long long start_time, char *name) {
 }
 
 
-// Prints the specified message and quits
+// Prints the specified message and quits, just for print message
 void die(char *message) {
     printf("%s\n", message);
-    exit(1);
+    exit(1); //quit and return 1
 }
