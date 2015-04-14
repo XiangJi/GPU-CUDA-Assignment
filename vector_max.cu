@@ -1,6 +1,6 @@
 #include <stdio.h>  // C standard I/O header
 #include <sys/time.h> // system time
-#include <cuda.h> //Defines the public host functions and types for the CUDA driver API
+#include <cuda.h> //Defines the public host functions and types for the CUDA API
 #include <cfloat> //C float.h
 #include <stdlib.h>
 //VERSION 1.4 MODIFIED 7/8 13:08 by Jack
@@ -115,7 +115,7 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
 
     int vector_size = N * sizeof(float);//size of float
 
-    // Allocate CPU memory for the result
+    // Allocate CPU memory for the result, give OUT_CPU space
     float *out_CPU = (float *) malloc(vector_size);
     if (out_CPU == NULL) die("Error allocating CPU memory");
 
@@ -125,18 +125,20 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     float *in_GPU, *out_GPU;
     if (cudaMalloc((void **) &in_GPU, vector_size) != cudaSuccess) die("Error allocating GPU memory");
     if (cudaMalloc((void **) &out_GPU, vector_size) != cudaSuccess) die("Error allocating GPU memory");
-	
+    //cudaSuccess is a error variable which record the error
+    //cudaPeekAtLastError() returns this variable. cudaGetLastError() returns this variable and resets it to cudaSuccess
+
     // Transfer the input vectors to GPU memory
-    cudaMemcpy(in_GPU, in_CPU, vector_size, cudaMemcpyHostToDevice);
-    cudaDeviceSynchronize();  // this is only needed for timing purposes
-    stop_timer(memory_start_time, "\nGPU:\t  Transfer to GPU");
+    cudaMemcpy(in_GPU, in_CPU, vector_size, cudaMemcpyHostToDevice);// dst, src, size, kind
+    cudaDeviceSynchronize();  //synchronize just after the call, check for asynchronous errors, here only timing purpose
+    stop_timer(memory_start_time, "\nGPU:\t  Transfer to GPU");// transfer time
 	
     // Determine the number of thread blocks in the x- and y-dimension
     int num_blocks = (int) ((float) (N + threads_per_block - 1) / (float) threads_per_block);
     int max_blocks_per_dimension = 65535;
     int num_blocks_y = (int) ((float) (num_blocks + max_blocks_per_dimension - 1) / (float) max_blocks_per_dimension);
     int num_blocks_x = (int) ((float) (num_blocks + num_blocks_y - 1) / (float) num_blocks_y);
-    dim3 grid_size(num_blocks_x, num_blocks_y, 1);
+    dim3 grid_size(num_blocks_x, num_blocks_y, 1);// flat
 	
     // Execute the kernel to compute the vector sum on the GPU
     long long kernel_start_time;
@@ -171,7 +173,7 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     // Transfer the result from the GPU to the CPU
     memory_start_time = start_timer();
     
-    //copy C back
+    //copy C back from GPU device to CPU
     cudaMemcpy(out_CPU, out_GPU, vector_size, cudaMemcpyDeviceToHost);
     checkError();
     cudaDeviceSynchronize();  // this is only needed for timing purposes

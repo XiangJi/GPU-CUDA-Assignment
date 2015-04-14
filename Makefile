@@ -1,6 +1,6 @@
 NVCC = /usr/local/cuda/bin/nvcc
 
-NVCC_FLAGS = -I/usr/local/cuda/include
+NVCC_FLAGS = -I/usr/local/cuda/include -L/usr/local/cuda/lib64
 
 # make dbg=1 tells nvcc to add debugging symbols to the binary
 ifeq ($(dbg),1)
