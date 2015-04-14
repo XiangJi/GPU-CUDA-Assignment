@@ -2,13 +2,12 @@
 #include <sys/time.h> // system time
 #include <cuda.h> //Defines the public host functions and types for the CUDA API
 #include <cfloat> //C float.h
-#include <stdlib.h>
 
 
 // The number of threads per blocks in the kernel
 // (if we define it here, then we can use its value in the kernel,
 //  for example to statically declare an array in shared memory)
-const int threads_per_block = 256; //256 threads per block, already defined as 256
+const int threads_per_block = 256;
 
 
 // Forward function declarations
@@ -78,7 +77,7 @@ int main(int argc, char **argv) {
 
 // A GPU kernel that computes the maximum value of a vector, some as loop for computing max
 // (each lead thread (threadIdx.x == 0) computes a single value, parallel kernel
-__global__ void vector_max_kernel(float *in, float *out, int N) {
+__global__ void vector_max_kernel1(float *in, float *out, int N) {
 
     // Determine the "flattened" block id and thread id, dim3 and unit3, still number but unassigned
     int block_id = blockIdx.x + gridDim.x * blockIdx.y;
@@ -133,50 +132,58 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     cudaDeviceSynchronize();  //synchronize just after the call, check for asynchronous errors, here only timing purpose
     stop_timer(memory_start_time, "\nGPU:\t  Transfer to GPU");// transfer time
 
-
-    bool lastBlock = false;
+    bool lastBlock = 0;
     while (!lastBlock) {
-    // Determine the number of thread blocks in the x- and y-dimension
-    int num_blocks = (int) ((float) (N + threads_per_block - 1) / (float) threads_per_block);
-    int max_blocks_per_dimension = 65535;
-    int num_blocks_y = (int) ((float) (num_blocks + max_blocks_per_dimension - 1) / (float) max_blocks_per_dimension);
-    int num_blocks_x = (int) ((float) (num_blocks + num_blocks_y - 1) / (float) num_blocks_y);
-    dim3 grid_size(num_blocks_x, num_blocks_y, 1);// flat
-	
-    // Execute the kernel to compute the vector sum on the GPU
-    long long kernel_start_time;
-    kernel_start_time = start_timer();
+        // Determine the number of thread blocks in the x- and y-dimension
+        int num_blocks = (int) ((float) (N + threads_per_block - 1) / (float) threads_per_block);
+        int max_blocks_per_dimension = 65535;
+        int num_blocks_y = (int) ((float) (num_blocks + max_blocks_per_dimension - 1) / (float) max_blocks_per_dimension);
+        int num_blocks_x = (int) ((float) (num_blocks + num_blocks_y - 1) / (float) num_blocks_y);
+        dim3 grid_size(num_blocks_x, num_blocks_y, 1);
 
-    switch(kernel_code){
-    case 1 : 
-        vector_max_kernel <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
-        break;
-    case 2 :
-        // vector_max_kernel2 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
-        break;
-    case 3 :
-        //vector_max_kernel3 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
-        break;
-    case 4 :
-        //vector_max_kernel4 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
-        break;
-    default :
-        die("INVALID KERNEL CODE\n");
+        // Execute the kernel to compute the vector sum on the GPU
+        long long kernel_start_time;
+        kernel_start_time = start_timer();
+
+        switch(kernel_code){
+        case 1 :
+            vector_max_kernel1 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            break;
+        case 2 :
+            //LAUNCH KERNEL FROM PROBLEM 2 HERE
+            //vector_max_kernel2 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            break;
+        case 3 :
+            //LAUNCH KERNEL FROM PROBLEM 3 HERE
+            //vector_max_kernel3 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            break;
+        case 4 :
+            //LAUNCH KERNEL FROM PROBLEM 4 HERE
+            //vector_max_kernel4 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            break;
+        default :
+            die("INVALID KERNEL CODE\n");
         }
-    if (num_blocks > 1) {
-    lastBlock = false;
-    N = num_blocks;
-    cudaMemcpy(in_CPU, out_CPU, vector_size, cudaMemcpyDeviceToDevice);
-    cudaDeviceSynchronize();
-    }
-    else {
-    lastBlock = true;
-    }
 
-    cudaDeviceSynchronize(); 
-    stop_timer(kernel_start_time, "\t Kernel execution");    
-    checkError();
-}    
+        if (num_blocks > 1) {
+            lastBlock = 0;
+            N = num_blocks;
+            cudaMemcpy(in_GPU, out_GPU, vector_size, cudaMemcpyDeviceToDevice);
+            cudaDeviceSynchronize();
+        }
+        else {
+            lastBlock = 1;
+        }
+
+        cudaDeviceSynchronize();  // this is only needed for timing purposes
+        stop_timer(kernel_start_time, "\t Kernel execution");
+
+        checkError();
+    }
+    
+
+
+
     // Transfer the result from the GPU to the CPU
     memory_start_time = start_timer();
     
@@ -190,7 +197,7 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     cudaFree(in_GPU);
     cudaFree(out_GPU);
 
-    float max = out_CPU[0];//The problem 1 comes from here, max maybe in other blocks.
+    float max = out_CPU[0];
     free(out_CPU);
 
     //return a single statistic, max in vector
@@ -257,9 +264,8 @@ void checkError() {
 
 // Returns the current time in microseconds, (us)
 //int gettimeofday (struct timeval *tv, struct timezone *tz)
-//timeval ---- tv_sec , tv_usec
 long long start_timer() {
-    struct timeval tv; //define tv as a stuct in sys/time.h, second and microsecond
+    struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000000 + tv.tv_usec;
 }
@@ -275,8 +281,8 @@ long long stop_timer(long long start_time, char *name) {
 }
 
 
-// Prints the specified message and quits, just for print message
+// Prints the specified message and quits
 void die(char *message) {
     printf("%s\n", message);
-    exit(1); //quit and return 1
+    exit(1); 
 }
