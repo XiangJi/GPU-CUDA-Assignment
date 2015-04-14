@@ -3,7 +3,7 @@
 #include <cuda.h> //Defines the public host functions and types for the CUDA API
 #include <cfloat> //C float.h
 #include <stdlib.h>
-//VERSION 1.4 MODIFIED 7/8 13:08 by Jack
+
 
 // The number of threads per blocks in the kernel
 // (if we define it here, then we can use its value in the kernel,
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
     if (GPU_time > CPU_time) printf("\nCPU outperformed GPU by %.2fx\n", (float) GPU_time / (float) CPU_time);
     else                     printf("\nGPU outperformed CPU by %.2fx\n", (float) CPU_time / (float) GPU_time);
 	
-    // Check the correctness of the GPU results
+    // Check the correctness of the GPU result, CPU must be correct
     int wrong = result_CPU != result_GPU;
 	
     // Report the correctness results
@@ -84,7 +84,7 @@ __global__ void vector_max_kernel(float *in, float *out, int N) {
     int block_id = blockIdx.x + gridDim.x * blockIdx.y;
     int thread_id = blockDim.x * block_id + threadIdx.x;
 
-    // A single "lead" thread in each block finds the maximum value over a range of size threads_per_block
+    // A single "lead" thread in each block finds the maximum value over a range of size threads_per_block, only use one thread in one block
     float max = 0.0;
     if (threadIdx.x == 0) {
 
@@ -122,7 +122,7 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     // Allocate GPU memory for the inputs and the result
     long long memory_start_time = start_timer();
 
-    float *in_GPU, *out_GPU;
+    float *in_GPU, *out_GPU;// the threads vector and the block vector
     if (cudaMalloc((void **) &in_GPU, vector_size) != cudaSuccess) die("Error allocating GPU memory");
     if (cudaMalloc((void **) &out_GPU, vector_size) != cudaSuccess) die("Error allocating GPU memory");
     //cudaSuccess is a error variable which record the error
@@ -132,7 +132,10 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     cudaMemcpy(in_GPU, in_CPU, vector_size, cudaMemcpyHostToDevice);// dst, src, size, kind
     cudaDeviceSynchronize();  //synchronize just after the call, check for asynchronous errors, here only timing purpose
     stop_timer(memory_start_time, "\nGPU:\t  Transfer to GPU");// transfer time
-	
+
+
+    bool lastBlock = false;
+    while (!lastBlock) {
     // Determine the number of thread blocks in the x- and y-dimension
     int num_blocks = (int) ((float) (N + threads_per_block - 1) / (float) threads_per_block);
     int max_blocks_per_dimension = 65535;
@@ -147,29 +150,33 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     switch(kernel_code){
     case 1 : 
         vector_max_kernel <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
-        
         break;
     case 2 :
-        //LAUNCH KERNEL FROM PROBLEM 2 HERE
-        die("KERNEL NOT IMPLEMENTED YET\n");
+        // vector_max_kernel2 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
         break;
     case 3 :
-        //LAUNCH KERNEL FROM PROBLEM 3 HERE
-        die("KERNEL NOT IMPLEMENTED YET\n");
+        //vector_max_kernel3 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
         break;
     case 4 :
-        //LAUNCH KERNEL FROM PROBLEM 4 HERE
-        die("KERNEL NOT IMPLEMENTED YET\n");
+        //vector_max_kernel4 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
         break;
     default :
         die("INVALID KERNEL CODE\n");
+        }
+    if (num_blocks > 1) {
+    lastBlock = false;
+    N = num_blocks;
+    cudaMemcpy(in_CPU, out_CPU, vector_size, cudaMemcpyDeviceToDevice);
+    cudaDeviceSynchronize();
     }
-    
-    cudaDeviceSynchronize();  // this is only needed for timing purposes
-    stop_timer(kernel_start_time, "\t Kernel execution");
-    
+    else {
+    lastBlock = true;
+    }
+
+    cudaDeviceSynchronize(); 
+    stop_timer(kernel_start_time, "\t Kernel execution");    
     checkError();
-    
+}    
     // Transfer the result from the GPU to the CPU
     memory_start_time = start_timer();
     
@@ -183,7 +190,7 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
     cudaFree(in_GPU);
     cudaFree(out_GPU);
 
-    float max = out_CPU[0];
+    float max = out_CPU[0];//The problem 1 comes from here, max maybe in other blocks.
     free(out_CPU);
 
     //return a single statistic, max in vector
