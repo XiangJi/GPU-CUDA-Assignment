@@ -8,7 +8,7 @@
 // The number of threads per blocks in the kernel
 // (if we define it here, then we can use its value in the kernel,
 //  for example to statically declare an array in shared memory)
-const int threads_per_block = 256; //256 threads per block
+const int threads_per_block = 256; //256 threads per block, already defined as 256
 
 
 // Forward function declarations
@@ -76,11 +76,11 @@ int main(int argc, char **argv) {
 }
 
 
-// A GPU kernel that computes the maximum value of a vector
+// A GPU kernel that computes the maximum value of a vector, some as loop for computing max
 // (each lead thread (threadIdx.x == 0) computes a single value, parallel kernel
 __global__ void vector_max_kernel(float *in, float *out, int N) {
 
-    // Determine the "flattened" block id and thread id
+    // Determine the "flattened" block id and thread id, dim3 and unit3, still number but unassigned
     int block_id = blockIdx.x + gridDim.x * blockIdx.y;
     int thread_id = blockDim.x * block_id + threadIdx.x;
 
@@ -88,16 +88,16 @@ __global__ void vector_max_kernel(float *in, float *out, int N) {
     float max = 0.0;
     if (threadIdx.x == 0) {
 
-        //calculate out of bounds guard
+        //calculate out of bounds guard, vague, actually the remained threads in on block
         //our block size will be 256, but our vector may not be a multiple of 256!
         int end = threads_per_block;
         if(thread_id + threads_per_block > N)
             end = N - thread_id;
 
-        //grab the lead thread's value
+        //grab the lead thread's value, in[] is the floast of the element in vector
         max = in[thread_id];
 
-        //grab values from all other threads' locations
+        //grab values from all other threads' locations, obtain max in every block
         for(int i = 1; i < end; i++) {
                 
             //if larger, replace
@@ -105,7 +105,7 @@ __global__ void vector_max_kernel(float *in, float *out, int N) {
                 max = in[thread_id + i];
         }
 
-        out[block_id] = max;
+        out[block_id] = max; // store every the the biggest value in all blocks
 
     }
 }
