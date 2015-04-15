@@ -2,7 +2,7 @@
 #include <sys/time.h> // system time
 #include <cuda.h> //Defines the public host functions and types for the CUDA API
 #include <cfloat> //C float.h
-
+#include <math.h>
 
 // The number of threads per blocks in the kernel
 // (if we define it here, then we can use its value in the kernel,
@@ -186,6 +186,47 @@ __global__ void vector_max_kernel3(float *in, float *out, int N) {
 		out[block_id] = sharedmem[0]; // put the max one in [0] for outblock
 	
 }
+//group useful threads
+__global__ void vector_max_kernel4(float *in, float *out, int N) {
+	//allocate a shared memory in block
+	__shared__ float sharedmem[threads_per_block];
+	__shared__ int end;
+    // Determine the "flattened" block id and thread id, dim3 and unit3, still number but unassigned
+    int block_id = blockIdx.x + gridDim.x * blockIdx.y;
+    int thread_id = blockDim.x * block_id + threadIdx.x;
+	
+	sharedmem[threadIdx.x] = 0;
+	//copy vector to each shared memory of each block;
+	sharedmem[threadIdx.x] = in[thread_id];
+	__syncthreads();
+
+    // A single "lead" thread in each block finds the maximum value over a range of size threads_per_block, only use one thread in one block
+    if (threadIdx.x == 0) {
+        //calculate out of bounds guard, vague, actually the remained threads in on block
+        //our block size will be 256, but our vector may not be a multiple of 256!
+        end = threads_per_block;
+        if(thread_id + threads_per_block > N)
+            end = N - thread_id;
+		
+		end = (int)powf(2, ceilf(log2f((float)end)));
+	}
+	__syncthreads();
+	
+	int tblock = end; 
+	while (tblock > 1){
+		if (threadIdx.x < tblock / 2) {
+			if(sharedmem[threadIdx.x] < sharedmem[threadIdx.x + tblock/2])
+				sharedmem[threadIdx.x] = sharedmem[threadIdx.x + tblock/2];
+		}
+		tblock /= 2;
+		__syncthreads();
+    }
+		
+	if (threadIdx.x == 0)
+		out[block_id] = sharedmem[0]; // put the max one in [0] for outblock
+	
+}
+
 
 
 // Returns the maximum value within a vector of length N, use GPU method
@@ -236,7 +277,7 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
             break;
         case 4 :
             //LAUNCH KERNEL FROM PROBLEM 4 HERE
-            //vector_max_kernel4 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            vector_max_kernel4 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
             break;
         default :
             die("INVALID KERNEL CODE\n");

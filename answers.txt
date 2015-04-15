@@ -1,0 +1,63 @@
+./vector_max 719226 -k 1
+
+KERNEL_CODE 1
+Vector generation: 0.02718 sec
+
+GPU:	  Transfer to GPU: 1.20496 sec
+	 Kernel execution: 0.00101 sec
+	 Kernel execution: 0.00011 sec
+	 Kernel execution: 0.00002 sec
+	Transfer from GPU: 0.00298 sec
+	            Total: 1.20975 sec
+
+CPU: 0.00240 sec
+
+CPU outperformed GPU by 504.48x
+
+./vector_max 719226 -k 2
+
+KERNEL_CODE 2
+Vector generation: 0.01741 sec
+
+GPU:	  Transfer to GPU: 1.17572 sec
+	 Kernel execution: 0.00096 sec
+	 Kernel execution: 0.00009 sec
+	 Kernel execution: 0.00001 sec
+	Transfer from GPU: 0.00296 sec
+	            Total: 1.18042 sec
+
+CPU: 0.00247 sec
+
+CPU outperformed GPU by 477.32x
+
+./vector_max 719226 -k 3
+
+KERNEL_CODE 3
+Vector generation: 0.02567 sec
+
+GPU:	  Transfer to GPU: 1.16174 sec
+	 Kernel execution: 0.00059 sec
+	 Kernel execution: 0.00009 sec
+	 Kernel execution: 0.00002 sec
+	Transfer from GPU: 0.00295 sec
+	            Total: 1.16606 sec
+
+CPU: 0.00118 sec
+
+CPU outperformed GPU by 985.68x
+
+./vector_max 719226 -k 4
+
+KERNEL_CODE 4
+Vector generation: 0.02235 sec
+
+GPU:	  Transfer to GPU: 1.17260 sec
+	 Kernel execution: 0.00040 sec
+	 Kernel execution: 0.00009 sec
+	 Kernel execution: 0.00002 sec
+	Transfer from GPU: 0.00278 sec
+	            Total: 1.17662 sec
+
+CPU: 0.00240 sec
+
+CPU outperformed GPU by 490.46x
