@@ -109,6 +109,85 @@ __global__ void vector_max_kernel1(float *in, float *out, int N) {
     }
 }
 
+__global__ void vector_max_kernel2(float *in, float *out, int N) {
+	//allocate a shared memory in block
+	__shared__ float sharedmem[threads_per_block];
+    // Determine the "flattened" block id and thread id, dim3 and unit3, still number but unassigned
+    int block_id = blockIdx.x + gridDim.x * blockIdx.y;
+    int thread_id = blockDim.x * block_id + threadIdx.x;
+	
+	//copy vector to each shared memory of each block;
+	sharedmem[threadIdx.x] = in[thread_id];
+	__syncthreads();
+
+    // A single "lead" thread in each block finds the maximum value over a range of size threads_per_block, only use one thread in one block
+    float max = 0.0;
+    if (threadIdx.x == 0) {
+
+        //calculate out of bounds guard, vague, actually the remained threads in on block
+        //our block size will be 256, but our vector may not be a multiple of 256!
+        int end = threads_per_block;
+        if(thread_id + threads_per_block > N)
+            end = N - thread_id;
+
+        //grab the lead thread's value, in[] is the floast of the element in vector
+        max = sharedmem[threadIdx.x];
+
+        //grab values from all other threads' locations, obtain max in every block
+        for(int i = 1; i < end; i++) {
+                
+            //always
+            if(max < sharedmem[threadIdx.x + i])
+                max = sharedmem[threadIdx.x + i];
+        }
+
+        out[block_id] = max; // store every the the biggest value in all blocks
+
+    }
+}
+
+
+__global__ void vector_max_kernel3(float *in, float *out, int N) {
+	//allocate a shared memory in block
+	__shared__ float sharedmem[threads_per_block];
+	__shared__ int end;
+    // Determine the "flattened" block id and thread id, dim3 and unit3, still number but unassigned
+    int block_id = blockIdx.x + gridDim.x * blockIdx.y;
+    int thread_id = blockDim.x * block_id + threadIdx.x;
+	
+	sharedmem[threadIdx.x] = 0;
+	//copy vector to each shared memory of each block;
+	sharedmem[threadIdx.x] = in[thread_id];
+	__syncthreads();
+
+    // A single "lead" thread in each block finds the maximum value over a range of size threads_per_block, only use one thread in one block
+    if (threadIdx.x == 0) {
+        //calculate out of bounds guard, vague, actually the remained threads in on block
+        //our block size will be 256, but our vector may not be a multiple of 256!
+        end = threads_per_block;
+        if(thread_id + threads_per_block > N)
+            end = N - thread_id;
+		if(end % 2 != 0)
+			end += 1;
+	}
+	__syncthreads();
+	
+	 //grab values from all other threads' locations, obtain max in every block
+    for(int i = 1; i < end; i = i * 2) {
+		if (threadIdx.x % (2 * i) == 0) {
+			//alway put bigger one in the lower position, step times 2 every iteration
+            if(sharedmem[threadIdx.x] < sharedmem[threadIdx.x + i])
+                sharedmem[threadIdx.x] = sharedmem[threadIdx.x + i];
+		}
+		__syncthreads();
+    }
+		
+	if (threadIdx.x == 0)
+		out[block_id] = sharedmem[0]; // put the max one in [0] for outblock
+	
+}
+
+
 // Returns the maximum value within a vector of length N, use GPU method
 float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
 
@@ -150,12 +229,10 @@ float GPU_vector_max(float *in_CPU, int N, int kernel_code) {
             vector_max_kernel1 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
             break;
         case 2 :
-            //LAUNCH KERNEL FROM PROBLEM 2 HERE
-            //vector_max_kernel2 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            vector_max_kernel2 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
             break;
         case 3 :
-            //LAUNCH KERNEL FROM PROBLEM 3 HERE
-            //vector_max_kernel3 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
+            vector_max_kernel3 <<< grid_size , threads_per_block >>> (in_GPU, out_GPU, N);
             break;
         case 4 :
             //LAUNCH KERNEL FROM PROBLEM 4 HERE
